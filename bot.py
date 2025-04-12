@@ -6,11 +6,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 TOKEN = os.environ["TOKEN"]
 
 # Image URL (तेरा QR या कोई प्रमोशन इमेज)
-  # 👈 यहाँ अपनी इमेज का लिंक डाल
+ IMAGE_URL = "qr.png" # 👈 यहाँ अपनी इमेज का लिंक डाल
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
-        IMAGE_URL = "qr.png"
         "**Kindly Pay ₹99 And Submit UTR Number**\n\n"
         "1. Phone Pe\n"
         "2. Paytm\n"

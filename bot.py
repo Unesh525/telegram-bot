@@ -1,77 +1,80 @@
 import os
-from telegram import Update, ParseMode
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters, CallbackQueryHandler
+)
 
-# TOKEN env variable से लिया जाएगा
+# ENV से Token और Admin ID लो
 TOKEN = os.environ["TOKEN"]
+ADMIN_ID = int(os.environ["ADMIN_ID"])  # Admin का Telegram user ID
 
-# Admin का Telegram User ID (तुम्हारा User ID)
-ADMIN_USER_ID = "7850701411"  # Admin का Telegram ID यहां डालो
+# Image path
+IMAGE_PATH = "qr.png"
 
-# Image URL (तेरा QR या कोई प्रमोशन इमेज)
-IMAGE_URL = "qr.png"  # 👈 यहाँ अपनी इमेज का लिंक डाल
+# Store users' data for approval system
+user_data = {}  # message_id: user_id mapping
 
+# /start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         "<b>Kindly Pay ₹99 And Submit Screenshot</b>\n\n"
-        "1. Phone Pe\n"
+        "1. PhonePe\n"
         "2. Paytm\n"
-        "3. G Pay\n"
+        "3. GPay\n"
         "4. Spotify Premium\n\n"
+        "📽️ <b>Tutorial Video:</b> <a href='https://t.me/phonepe_New/3'>Click here</a>"
+    )
+    await update.message.reply_photo(
+        photo=IMAGE_PATH,
+        caption=message,
+        parse_mode="HTML"
     )
 
-    # इमेज के साथ टेक्स्ट भेजो (caption के रूप में)
-    await update.message.reply_photo(photo=IMAGE_URL, caption=message, parse_mode="HTML")
-
-# जब यूजर स्क्रीनशॉट भेजे, तो उसे admin को भेजो
+# जब यूज़र screenshot भेजे
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # यूजर ने जो स्क्रीनशॉट भेजा है, उसे प्राप्त करना
-    file = await update.message.photo[-1].get_file()
+    user = update.message.from_user
+    photo = update.message.photo[-1]
+    caption = f"🧾 Payment Screenshot from @{user.username or user.first_name} (ID: {user.id})"
 
-    # स्क्रीनशॉट का लिंक प्राप्त करें (डाउनलोड लिंक)
-    file_url = file.file_path
-
-    # Admin को स्क्रीनशॉट भेजो
-    admin_message = f"New screenshot received!\n\nFile URL: {file_url}\n\nUser: {update.message.from_user.username}"
-    await context.bot.send_message(chat_id=ADMIN_USER_ID, text=admin_message)
-
-    # Admin को approval/rejection के ऑप्शन के साथ मैसेज भेजें
-    buttons = [
+    # Admin को फोटो भेजो + Approve/Reject बटन
+    keyboard = InlineKeyboardMarkup([
         [
-            ("Approve", "approve"),  # Approve बटन
-            ("Reject", "reject")     # Reject बटन
+            InlineKeyboardButton("✅ Approve", callback_data=f"approve:{user.id}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"reject:{user.id}")
         ]
-    ]
-    await context.bot.send_message(
-        chat_id=ADMIN_USER_ID,
-        text="Please approve or reject this payment screenshot:",
-        reply_markup={"inline_keyboard": buttons}
+    ])
+    sent = await context.bot.send_photo(
+        chat_id=ADMIN_ID,
+        photo=photo.file_id,
+        caption=caption,
+        reply_markup=keyboard
     )
 
-# Admin के द्वारा approve/reject की कार्रवाई को हैंडल करें
+    # Store message reference
+    user_data[sent.message_id] = user.id
+
+# जब Admin Approve/Reject दबाए
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    action = query.data
+    action, user_id = query.data.split(":")
+    user_id = int(user_id)
 
-    # Action के आधार पर जवाब भेजें
     if action == "approve":
-        await query.answer("Payment Approved! 🎉")
-        await query.message.reply_text("The payment screenshot has been approved.")
+        await context.bot.send_message(chat_id=user_id, text="✅ Your payment has been *Approved!*", parse_mode="Markdown")
+        await query.edit_message_caption(caption="✅ Payment Approved.", reply_markup=None)
     elif action == "reject":
-        await query.answer("Payment Rejected! 🚫")
-        await query.message.reply_text("The payment screenshot has been rejected.")
+        await context.bot.send_message(chat_id=user_id, text="❌ Your payment has been *Rejected!*", parse_mode="Markdown")
+        await query.edit_message_caption(caption="❌ Payment Rejected.", reply_markup=None)
+
+    await query.answer()  # जरूरी है वरना बटन घूमता रहेगा
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Command handler जोड़ें
     app.add_handler(CommandHandler("start", start))
-
-    # स्क्रीनशॉट का हैंडलर जोड़ें
     app.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))
-
-    # बटन क्लिक पर handler जोड़ें
-    app.add_handler(MessageHandler(filters.CallbackQuery, button_handler))
+    app.add_handler(CallbackQueryHandler(button_handler))
 
     app.run_polling()
 

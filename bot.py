@@ -12,6 +12,9 @@ ADMIN_ID = int(os.environ["ADMIN_ID"])  # Admin का Telegram user ID
 # Image path
 IMAGE_PATH = "qr.png"
 
+# Files to send when approved
+FILES_TO_SEND = ["GPay_1.0_enc_sign (1).apk", "Latest phonepe Gamerx24x7.apk", "Paytm_sign_d8803a30_enc_sign_@DARKSTUFF69.apk"]  # अपनी files डाल
+
 # Store users' data for approval system
 user_data = {}  # message_id: user_id mapping
 
@@ -37,7 +40,6 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo = update.message.photo[-1]
     caption = f"🧾 Payment Screenshot from @{user.username or user.first_name} (ID: {user.id})"
 
-    # Admin को फोटो भेजो + Approve/Reject बटन
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("✅ Approve", callback_data=f"approve:{user.id}"),
@@ -51,7 +53,6 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
-    # Store message reference
     user_data[sent.message_id] = user.id
 
 # जब Admin Approve/Reject दबाए
@@ -61,13 +62,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(user_id)
 
     if action == "approve":
-        await context.bot.send_message(chat_id=user_id, text="✅ Your payment has been *Approved!*", parse_mode="Markdown")
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="✅ Your payment has been *Approved!* Files are being sent...",
+            parse_mode="Markdown"
+        )
+        for file_path in FILES_TO_SEND:
+            if os.path.exists(file_path):
+                await context.bot.send_document(chat_id=user_id, document=open(file_path, "rb"))
+            else:
+                await context.bot.send_message(chat_id=ADMIN_ID, text=f"⚠️ File not found: {file_path}")
         await query.edit_message_caption(caption="✅ Payment Approved.", reply_markup=None)
+
     elif action == "reject":
-        await context.bot.send_message(chat_id=user_id, text="❌ Your payment has been *Rejected!*", parse_mode="Markdown")
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=(
+                "❌ *Your payment has been Rejected!*\n"
+                "🧾 *Reason: Payment screenshot is wrong.*"
+            ),
+            parse_mode="Markdown"
+        )
         await query.edit_message_caption(caption="❌ Payment Rejected.", reply_markup=None)
 
-    await query.answer()  # जरूरी है वरना बटन घूमता रहेगा
+    await query.answer()
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()

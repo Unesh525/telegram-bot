@@ -10,7 +10,7 @@ IMAGE_URL = "qr.png"  # 👈 यहाँ अपनी इमेज का ल�
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
-        "<b>Kindly Pay ₹99 And Submit UTR Number</b>\n\n"
+        "<b>Kindly Pay ₹99 And Submit Screenshot</b>\n\n"
         "1. Phone Pe\n"
         "2. Paytm\n"
         "3. G Pay\n"
